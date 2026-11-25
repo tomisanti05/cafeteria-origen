@@ -1,6 +1,8 @@
 import express from 'express';
 import * as usuarios from '../services/usuarios.service';
-import { crearSesion, destruirSesion, obtenerSesion } from '../middleware/sesion';
+import { crearSesion, destruirSesion, obtenerSesion, limpiarCookieSesion } from '../middleware/sesion';
+import rateLimit from 'express-rate-limit';
+
 
 const router = express.Router();
 
@@ -15,7 +17,21 @@ const router = express.Router();
  *  - Sin rate limiting ni bloqueo: fuerza bruta ilimitada.
  *  - El identificador de sesión no se regenera (fijación de sesión).
  */
-router.post('/login', async (req, res, next) => {
+
+// Limita los intentos de inicio de sesión para prevenir ataques de fuerza bruta.
+const limiterLogin = rateLimit({
+  windowMs: 15 * 60 * 1000, // Ventana de 15 minutos.
+  limit: 5, // Máximo 5 intentos.
+  standardHeaders: true, //informa el límite mediante encabezados HTTP
+  legacyHeaders: false, //desactiva los encabezados antiguos
+  skipSuccessfulRequests: true, //no cuenta los intentos exitosos
+  message: { 
+    error: 'Demasiados intentos. Intente nuevamente en 15 minutos.',
+  },
+});
+
+
+router.post('/login', limiterLogin, async (req, res, next) => {
   try {
     const { username, password } = req.body || {};
 
@@ -26,17 +42,8 @@ router.post('/login', async (req, res, next) => {
     // La verificación de credenciales es la consulta concatenada (SQLi).
     const usuario = await usuarios.autenticar(username, password);
 
-    if (!usuario) {
-      // FALLA — Enumeración de usuarios: el mensaje distingue entre
-      // "no existe" y "contraseña incorrecta", lo que permite a un atacante
-      // averiguar qué cuentas hay en el sistema.
-      const existe = await usuarios.buscarPorUsername(username);
-      if (existe) {
-        return res.status(401).json({ error: 'La contraseña es incorrecta.' });
-      }
-      return res
-        .status(401)
-        .json({ error: `El usuario "${username}" no existe en el sistema.` });
+    if (!usuario) { //se utiliza un mensaje generico para evitar revelar si el usuario existe o no, evitando asi la enumeracion de usuarios
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
     }
 
     crearSesion(req, res, {
@@ -60,24 +67,35 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-/**
- * Cierre de sesión.
- *
- * FALLA: sólo borra la cookie del navegador. La sesión sigue existiendo en el
- * servidor, así que con la cookie robada se puede seguir usando.
- */
-router.post('/logout', (req, res) => {
-  res.clearCookie('sid', { path: '/' });
-  res.json({ mensaje: 'Sesión cerrada.' });
-});
 
-/** Devuelve el usuario de la sesión actual. */
+ /* Devuelve el usuario de la sesión actual.
+ */
 router.get('/yo', (req, res) => {
   const sesion = obtenerSesion(req);
+
+  // Si no existe una sesión válida, rechaza el acceso.
   if (!sesion) {
-    return res.status(401).json({ error: 'Necesitás iniciar sesión.' });
+    return res.status(401).json({
+      error: 'No hay una sesión activa.',
+    });
   }
-  res.json({ usuario: sesion.usuario });
+
+  // Devuelve los datos del usuario autenticado.
+  return res.json({
+    usuario: sesion.usuario,
+  });
+});
+
+
+
+router.post('/logout', (req, res) => {
+  // Elimina la sesión almacenada en el servidor.
+  destruirSesion(req);
+
+  // Elimina la cookie del navegador.
+  limpiarCookieSesion(res);
+
+  res.json({ mensaje: 'Sesión cerrada.' });
 });
 
 export default router;

@@ -4,6 +4,16 @@
 - **Almacenamiento seguro de credenciales:** Nunca guardar contraseñas en texto plano; usar algoritmos de hashing lento con *salt* por usuario (`bcrypt` o `argon2`) desde el primer día.
 - **Pruebas automatizadas de seguridad en CI/CD:** Integrar análisis estático (`check:security`) y tests de seguridad (`test:seguridad`) en el pipeline de integración continua para detectar regresiones antes de llegar a producción.
 
+
+# Reflexión Maitena Surop
+- **Protección contra ataques de fuerza bruta:** Limitar los intentos de inicio de sesión mediante *rate limiting* para evitar que un atacante pueda probar contraseñas ilimitadamente. También es importante permitir nuevos intentos después del período de bloqueo.
+- **Prevención de enumeración de usuarios:** Utilizar mensajes de error genéricos al iniciar sesión, sin indicar si el usuario no existe o si la contraseña es incorrecta. De esta manera se evita revelar información sobre las cuentas registradas.
+- **Gestión segura de sesiones:** Utilizar identificadores aleatorios mediante `crypto.randomUUID()` en lugar de identificadores predecibles. Configurar cookies con `HttpOnly`, `Secure` y `SameSite`, además de establecer tiempos de expiración por inactividad y duración máxima.
+- **Invalidación y cierre de sesiones:** Eliminar las sesiones anteriores al iniciar sesión y destruir la sesión almacenada en el servidor al cerrar sesión. No alcanza solamente con borrar la cookie del navegador.
+- **Validación segura de contraseñas:** Comprendí la importancia de trabajar coordinadamente con el almacenamiento de credenciales mediante `bcrypt`. Mientras se utiliza `bcrypt.hash()` para guardar las contraseñas, el inicio de sesión debe utilizar `bcrypt.compare()` para verificar las credenciales sin almacenar contraseñas en texto plano.
+- **Importancia de las pruebas de seguridad:** Realizar pruebas automatizadas permite comprobar que las medidas implementadas funcionan correctamente y detectar posibles vulnerabilidades antes de integrar los cambios en la rama principal.
+
+
 # Reflexion Tomas Mertian
 - **No alcanza con validar la entrada:** si después pintás los datos con HTML crudo, el navegador ejecuta lo que venga. La solución fue armar el DOM con `createElement` y `textContent`, también en las tablas del panel y en el parámetro `vista` de la URL.
 - **La CSP es una red de contención, no la única defensa:** configurar Helmet con `script-src 'self'` y `object-src 'none'` ayuda a limitar el daño, pero primero hay que escapar bien la salida.
