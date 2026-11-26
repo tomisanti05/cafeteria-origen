@@ -41,7 +41,7 @@ const opcionesCookie = {
 };
 
 export const sesiones = new Map<string, Sesion>();
-let contadorSesiones = 0;
+// let contadorSesiones = 0;
 
 /** Lee las cookies de la petición (parser mínimo, sin dependencias). */
 export function leerCookies(req: Request): Record<string, string> {
@@ -82,7 +82,7 @@ if (cookies.sid) {
   sesiones.set(id, {
     usuario,
     creadaEn: ahora,
-    expiraEn: ahora + DURACION_INACTIVIDAD, // (corregido) se establece la expiración por inactividad
+    expiraEn: Date.now() + DURACION_INACTIVIDAD, // (corregido) se establece la expiración por inactividad
   });
 
   // FALLA: cookie sin httpOnly / secure / sameSite.
